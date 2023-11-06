@@ -1,66 +1,101 @@
-import {useState} from 'react';
-import OpenAI from "openai";
+import React, { useState, useEffect } from 'react';
+import OpenAI from 'openai';
 
-
-
-const Chatbot = () =>{
+const API_KEY = process.env.REACT_APP_KEY
+const ORG = process.env.REACT_APP_ORG
+const Chatbot = () => {
   const openai = new OpenAI({
-      organization: "org-Ab7i9S7PkFRFmtmSmGeQIiff",
-      apiKey: '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',
-      dangerouslyAllowBrowser: true
+    organization: ORG,
+    apiKey: API_KEY,
+    dangerouslyAllowBrowser: true,
   });
-;
-  const [prompt, setPrompt] = useState('');
+
+  const [userPrompt, setUserPrompt] = useState('');
+  // eslint-disable-next-line no-unused-vars
   const [apiResponse, setApiResponse] = useState('');
   const [loading, setLoading] = useState(false);
+  const [conversation, setConversation] = useState([]);
+  const [showWelcome, setShowWelcome] = useState(true);
 
+  const addMessageToConversation = (role, content) => {
+    setConversation((prevConversation) => [
+      ...prevConversation,
+      { role, content },
+    ]);
+  };
 
-  const handleSubmit = async (e) =>{
-    e.preventDefault(); 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setLoading(true);
+    setShowWelcome(false);
 
-    try{
+    try {
       const result = await openai.chat.completions.create({
         model: 'gpt-3.5-turbo',
-        messages: [{role:'system', content:'You are a helpful assistant'}],
- 
+        messages: [
+          { role: 'system', content: 'You are a helpful assistant' },
+          { role: 'user', content: userPrompt },
+          ...conversation,
+        ],
         temperature: 0.5,
-        max_tokens: 2200
+        max_tokens: 2200,
       });
-      setApiResponse(result.choices[0])
-    } catch(error) {
-      console.log(error)
+      setApiResponse(result.choices[0].message.content);
+
+      // Add the user's message to the conversation
+      addMessageToConversation('user', userPrompt);
+
+      // Add the assistant's response to the conversation
+      addMessageToConversation('assistant', result.choices[0].message.content);
+
+    } catch (error) {
+      console.log(error);
     }
     setLoading(false);
+    setUserPrompt('');
   };
+
+  useEffect(() => {
+    // Reset the welcome message when a new user prompt is entered
+    setShowWelcome(true);
+  }, [userPrompt]);
 
   return (
     <>
-      <div style={{
-        display:'flex',
-        justifyContent:'center',
-        alignItems: 'center',
-        height: '100vh',
-      }}>
-        <form onSubmit={handleSubmit}>
-          <textarea type='text' value={prompt} placeholder='Please ask openai' onChange={(e) =>setPrompt(e.target.value)}></textarea>
-          <button disabled={loading || prompt.length === 0} type='submit'>
-            {loading ? "Generating...": "Generate"}
-          </button>
-        </form>
-      </div>
-      {apiResponse && (
-        <div style={{ display: 'flex', justifyContent: 'center'}}>
-          <pre>
-            <strong>API response:</strong>
-            {apiResponse}
-          </pre>
+      <div className="ai-container">
+        <div id="header">
+          <h1>Chatbot</h1>
         </div>
-      )}
+        <div id="chatbot">
+        <div id="conversation">
+  {showWelcome && (
+    <div className="chatbot-message">
+      <p className="chatbot-text assistant">Assistant: Welcome! Please enter a question or request.</p>
+    </div>
+  )}
+  {conversation.map((message, index) => (
+    <div key={index} className={`chatbot-message ${message.role}`}>
+      <p className={`chatbot-text ${message.role}`}>
+        {message.role === 'user' ? 'User: ' : 'Assistant: '}{message.content}
+      </p>
+    </div>
+  ))}
+</div>
+          <form onSubmit={handleSubmit}>
+            <input
+              type="text"
+              value={userPrompt}
+              placeholder="Please ask OpenAI"
+              onChange={(e) => setUserPrompt(e.target.value)}
+            />
+            <button disabled={loading || userPrompt.length === 0} type="submit">
+              {loading ? 'Generating...' : 'Generate'}
+            </button>
+          </form>
+        </div>
+      </div>
     </>
-  )
-}
+  );
+};
 
-export default Chatbot
-
-
+export default Chatbot;
